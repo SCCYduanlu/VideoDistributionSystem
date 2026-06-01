@@ -30,7 +30,7 @@ def dashboard(request):
     projects_count = Project.objects.count()
     members_count = Member.objects.count()
     videos_count = Video.objects.count()
-    recent_logs = AccessLog.objects.order_by('-accessed_at')[:10]
+    recent_logs = AccessLog.objects.select_related('extraction_code__member', 'extraction_code__project').order_by('-accessed_at')[:20]
     return render(request, 'distribution/admin/dashboard.html', {
         'projects_count': projects_count,
         'members_count': members_count,
@@ -60,9 +60,13 @@ def project_create(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
 def project_detail(request, project_id):
+    from django.db.models import Count, Max
     project = get_object_or_404(Project, id=project_id)
     videos = project.videos.all()
-    extraction_codes = project.extraction_codes.all()
+    extraction_codes = project.extraction_codes.select_related('member').annotate(
+        access_count=Count('logs'),
+        last_access=Max('logs__accessed_at')
+    )
     return render(request, 'distribution/admin/project_detail.html', {
         'project': project,
         'videos': videos,
@@ -129,6 +133,13 @@ def add_member_to_project(request, project_id):
             return redirect('custom_admin:project_detail', project_id=project.id)
             
     return render(request, 'distribution/admin/member_form.html', {'project': project})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def code_logs(request, code_id):
+    code = get_object_or_404(ExtractionCode.objects.select_related('member', 'project'), id=code_id)
+    logs = code.logs.all().order_by('-accessed_at')
+    return render(request, 'distribution/admin/code_logs.html', {'code': code, 'logs': logs})
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')

@@ -55,12 +55,19 @@
             <li class="px-6 py-4 flex justify-between items-center hover:bg-gray-50">
                 <div>
                     <p class="text-sm font-medium text-gray-900">{{ code.member.nickname }} <span class="text-xs text-gray-500">(QQ: {{ code.member.qq }})</span></p>
-                    <p class="text-xs text-gray-500 mt-1">
+                    <p class="text-xs text-gray-500 mt-1 mb-1">
                         提取码: <span class="font-mono bg-gray-100 px-1 rounded text-indigo-600">{{ code.code }}</span>
                     </p>
+                    <p class="text-xs text-gray-500 flex items-center gap-3">
+                        <span><i class="fas fa-eye mr-1"></i>访问次数: <span class="{% if code.access_count > 0 %}text-green-600 font-medium{% endif %}">{{ code.access_count }}</span></span>
+                        {% if code.last_access %}
+                        <span><i class="far fa-clock mr-1"></i>最后访问: {{ code.last_access|date:"Y-m-d H:i:s" }}</span>
+                        {% endif %}
+                    </p>
                 </div>
-                <div>
-                    <a href="{% url 'custom_admin:code_delete' code.id %}" class="text-red-600 hover:text-red-900 text-sm" title="删除"><i class="fas fa-trash"></i></a>
+                <div class="flex items-center space-x-3">
+                    <a href="{% url 'custom_admin:code_logs' code.id %}" class="text-blue-600 hover:text-blue-900 text-sm" title="查看详细日志"><i class="fas fa-list-alt"></i> 日志</a>
+                    <a href="{% url 'custom_admin:code_delete' code.id %}" class="text-red-600 hover:text-red-900 text-sm" title="删除"><i class="fas fa-trash"></i> 删除</a>
                 </div>
             </li>
             {% empty %}
