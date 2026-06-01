@@ -1,0 +1,72 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}项目详情: {{ project.title }} - 管理后台{% endblock %}
+{% block header %}
+<div class="flex items-center">
+    <a href="{% url 'custom_admin:project_list' %}" class="text-gray-500 hover:text-gray-700 mr-2"><i class="fas fa-arrow-left"></i></a>
+    项目详情: {{ project.title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-2">项目信息</h3>
+    <p class="text-sm text-gray-600 mb-4">{{ project.description|default:"无描述" }}</p>
+    <div class="text-xs text-gray-500">创建于: {{ project.created_at|date:"Y-m-d H:i:s" }}</div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Videos Section -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-medium text-gray-800"><i class="fas fa-film text-gray-500 mr-2"></i>视频列表</h3>
+            <a href="{% url 'custom_admin:video_create' project.id %}" class="text-sm bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-1 rounded transition-colors">
+                <i class="fas fa-plus"></i> 添加视频
+            </a>
+        </div>
+        <ul class="divide-y divide-gray-200">
+            {% for video in videos %}
+            <li class="px-6 py-4 flex justify-between items-center hover:bg-gray-50">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">{{ video.title }}</p>
+                    <p class="text-xs text-gray-500">上传于: {{ video.uploaded_at|date:"Y-m-d H:i" }}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{{ video.video_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-900 text-sm" title="预览"><i class="fas fa-play"></i></a>
+                    <a href="{% url 'custom_admin:video_delete' video.id %}" class="text-red-600 hover:text-red-900 text-sm" title="删除"><i class="fas fa-trash"></i></a>
+                </div>
+            </li>
+            {% empty %}
+            <li class="px-6 py-8 text-center text-sm text-gray-500">此项目暂无视频</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Members Section -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-medium text-gray-800"><i class="fas fa-users text-gray-500 mr-2"></i>授权会员 (提取码)</h3>
+            <a href="{% url 'custom_admin:add_member' project.id %}" class="text-sm bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition-colors">
+                <i class="fas fa-user-plus"></i> 录入会员
+            </a>
+        </div>
+        <ul class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+            {% for code in extraction_codes %}
+            <li class="px-6 py-4 flex justify-between items-center hover:bg-gray-50">
+                <div>
+                    <p class="text-sm font-medium text-gray-900">{{ code.member.nickname }} <span class="text-xs text-gray-500">(QQ: {{ code.member.qq }})</span></p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        提取码: <span class="font-mono bg-gray-100 px-1 rounded text-indigo-600">{{ code.code }}</span>
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'custom_admin:code_delete' code.id %}" class="text-red-600 hover:text-red-900 text-sm" title="删除"><i class="fas fa-trash"></i></a>
+                </div>
+            </li>
+            {% empty %}
+            <li class="px-6 py-8 text-center text-sm text-gray-500">暂无会员录入</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

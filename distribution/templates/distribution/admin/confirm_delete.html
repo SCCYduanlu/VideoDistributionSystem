@@ -1,0 +1,26 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}确认删除{% endblock %}
+{% block header %}确认删除{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow max-w-xl mx-auto p-6 text-center">
+    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+    </div>
+    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2">确认要删除 "{{ object }}" 吗？</h3>
+    <div class="mt-2 mb-6">
+        <p class="text-sm text-gray-500">此操作不可逆，所有关联的数据可能会被级联删除。请确认是否继续？</p>
+    </div>
+    
+    <form method="post" class="flex justify-center space-x-4">
+        {% csrf_token %}
+        <a href="{{ cancel_url }}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            取消
+        </a>
+        <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+            确认删除
+        </button>
+    </form>
+</div>
+{% endblock %}
