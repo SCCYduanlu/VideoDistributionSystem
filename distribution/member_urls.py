@@ -7,4 +7,5 @@ urlpatterns = [
     path('', member_views.index, name='index'),
     path('verify/', member_views.verify_code, name='verify_code'),
     path('videos/<str:code>/', member_views.video_list, name='video_list'),
+    path('videos/<str:code>/download/<int:video_id>/', member_views.download_video, name='download_video'),
 ]

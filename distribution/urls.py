@@ -18,4 +18,6 @@ urlpatterns = [
     path('projects/<int:project_id>/member/add/', views.add_member_to_project, name='add_member'),
     path('code/<int:code_id>/logs/', views.code_logs, name='code_logs'),
     path('code/<int:code_id>/delete/', views.code_delete, name='code_delete'),
+    
+    path('tools/watermark/', views.watermark_tool, name='watermark_tool'),
 ]

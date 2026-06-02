@@ -87,12 +87,29 @@ def project_delete(request, project_id):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
 def video_create(request, project_id):
+    import random
+    from .utils import get_video_duration
     project = get_object_or_404(Project, id=project_id)
     if request.method == 'POST':
         title = request.POST.get('title')
         video_file = request.FILES.get('video_file')
         if title and video_file:
-            Video.objects.create(project=project, title=title, video_file=video_file)
+            video = Video.objects.create(project=project, title=title, video_file=video_file)
+            
+            # Generate random watermark timestamps
+            duration = get_video_duration(video.video_file.path)
+            timestamps = []
+            if duration > 10:
+                # pick 3 random timestamps
+                for _ in range(3):
+                    timestamps.append(random.randint(5, int(duration) - 5))
+                timestamps.sort()
+            else:
+                timestamps = [0]
+            
+            video.watermark_timestamps = timestamps
+            video.save()
+            
             messages.success(request, '视频上传成功！')
             return redirect('custom_admin:project_detail', project_id=project.id)
     return render(request, 'distribution/admin/video_form.html', {'project': project})
@@ -151,3 +168,64 @@ def code_delete(request, code_id):
         messages.success(request, '提取码删除成功！')
         return redirect('custom_admin:project_detail', project_id=project_id)
     return render(request, 'distribution/admin/confirm_delete.html', {'object': code, 'cancel_url': f'/admin/projects/{project_id}/'})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def watermark_tool(request):
+    from .utils import decrypt_token, extract_audio_watermark
+    import os
+    from django.conf import settings
+    
+    result = None
+    if request.method == 'POST':
+        # Check if a file was uploaded for audio extraction
+        if 'video_file' in request.FILES:
+            uploaded_file = request.FILES['video_file']
+            # Save temp file
+            temp_path = os.path.join(settings.MEDIA_ROOT, 'temp_upload.mp4')
+            with open(temp_path, 'wb+') as destination:
+                for chunk in uploaded_file.chunks():
+                    destination.write(chunk)
+                    
+            try:
+                import subprocess
+                # Extract audio
+                temp_audio = os.path.join(settings.MEDIA_ROOT, 'temp_extract.wav')
+                subprocess.run(['ffmpeg', '-y', '-i', temp_path, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', temp_audio], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                # Extract token
+                token = extract_audio_watermark(temp_audio, token_length=120)
+                
+                # Cleanup
+                if os.path.exists(temp_path): os.remove(temp_path)
+                if os.path.exists(temp_audio): os.remove(temp_audio)
+                
+                if token:
+                    request.POST = request.POST.copy()
+                    request.POST['token'] = token
+                else:
+                    result = {'success': False, 'error': '未能在视频音频中检测到有效的水印Token'}
+            except Exception as e:
+                result = {'success': False, 'error': f'处理视频文件时出错: {str(e)}'}
+                
+        token = request.POST.get('token')
+        if token and not result:
+            token = token.strip()
+            ext_id, vid_id = decrypt_token(token)
+            if ext_id and vid_id:
+                try:
+                    code = ExtractionCode.objects.get(id=ext_id)
+                    video = Video.objects.get(id=vid_id)
+                    result = {
+                        'success': True,
+                        'member': code.member,
+                        'project': code.project,
+                        'code': code.code,
+                        'video': video,
+                        'extracted_token': token
+                    }
+                except (ExtractionCode.DoesNotExist, Video.DoesNotExist):
+                    result = {'success': False, 'error': 'Token解析成功，但对应数据已删除'}
+            else:
+                result = {'success': False, 'error': f'解密失败。提取到的Token为: {token}'}
+    return render(request, 'distribution/admin/watermark_tool.html', {'result': result})

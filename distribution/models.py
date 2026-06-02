@@ -29,6 +29,7 @@ class Video(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='videos', verbose_name='所属项目')
     title = models.CharField(max_length=200, verbose_name='视频标题')
     video_file = models.FileField(upload_to='videos/%Y/%m/', verbose_name='视频文件')
+    watermark_timestamps = models.JSONField(default=list, blank=True, verbose_name='水印出现秒数')
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
 
     class Meta:
@@ -72,3 +73,18 @@ class AccessLog(models.Model):
 
     def __str__(self):
         return f"{self.extraction_code.code} - {self.ip_address}"
+
+class WatermarkedVideo(models.Model):
+    extraction_code = models.ForeignKey(ExtractionCode, on_delete=models.CASCADE, related_name='watermarked_videos')
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='watermarked_videos')
+    file_path = models.CharField(max_length=500, blank=True, verbose_name='文件路径')
+    status = models.CharField(max_length=20, default='pending', verbose_name='处理状态') # pending, processing, done, failed
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+
+    class Meta:
+        verbose_name = '带水印视频'
+        verbose_name_plural = '带水印视频'
+        unique_together = ('extraction_code', 'video')
+
+    def __str__(self):
+        return f"{self.extraction_code.code} - {self.video.title} - {self.status}"

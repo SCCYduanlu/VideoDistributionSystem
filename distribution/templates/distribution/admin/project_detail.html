@@ -29,7 +29,15 @@
             <li class="px-6 py-4 flex justify-between items-center hover:bg-gray-50">
                 <div>
                     <p class="text-sm font-medium text-gray-900">{{ video.title }}</p>
-                    <p class="text-xs text-gray-500">上传于: {{ video.uploaded_at|date:"Y-m-d H:i" }}</p>
+                    <p class="text-xs text-gray-500 mt-1 mb-1">上传于: {{ video.uploaded_at|date:"Y-m-d H:i" }}</p>
+                    <p class="text-xs text-gray-500">
+                        <i class="fas fa-fingerprint mr-1"></i>水印出现秒数: 
+                        {% if video.watermark_timestamps %}
+                            <span class="font-mono bg-gray-100 px-1 rounded text-indigo-600">{{ video.watermark_timestamps|join:", " }}</span>
+                        {% else %}
+                            <span class="text-gray-400">无数据</span>
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="flex space-x-2">
                     <a href="{{ video.video_file.url }}" target="_blank" class="text-blue-600 hover:text-blue-900 text-sm" title="预览"><i class="fas fa-play"></i></a>
