@@ -51,11 +51,55 @@ def project_create(request):
     if request.method == 'POST':
         title = request.POST.get('title')
         description = request.POST.get('description')
+        code_expire_days = request.POST.get('code_expire_days', 0)
+        try:
+            code_expire_days = int(code_expire_days)
+        except ValueError:
+            code_expire_days = 0
+            
         if title:
-            Project.objects.create(title=title, description=description)
+            Project.objects.create(title=title, description=description, code_expire_days=code_expire_days)
             messages.success(request, '项目创建成功！')
             return redirect('custom_admin:project_list')
     return render(request, 'distribution/admin/project_form.html')
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def project_edit(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        code_expire_days = request.POST.get('code_expire_days', 0)
+        update_existing = request.POST.get('update_existing_codes') == 'on'
+        
+        try:
+            code_expire_days = int(code_expire_days)
+        except ValueError:
+            code_expire_days = 0
+            
+        if title:
+            project.title = title
+            project.description = description
+            project.code_expire_days = code_expire_days
+            project.save()
+            
+            if update_existing:
+                from django.utils import timezone
+                import datetime
+                codes = project.extraction_codes.all()
+                for code in codes:
+                    if code_expire_days > 0:
+                        code.expires_at = code.created_at + datetime.timedelta(days=code_expire_days)
+                    else:
+                        code.expires_at = None
+                    code.save()
+                messages.success(request, f'项目修改成功，并已更新所有 {codes.count()} 个历史提取码的过期时间！')
+            else:
+                messages.success(request, '项目修改成功！')
+                
+            return redirect('custom_admin:project_detail', project_id=project.id)
+    return render(request, 'distribution/admin/project_form.html', {'project': project})
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
@@ -141,8 +185,14 @@ def add_member_to_project(request, project_id):
                 member.save()
             
             # Generate extraction code
+            from django.utils import timezone
+            import datetime
+            
             code, created = ExtractionCode.objects.get_or_create(project=project, member=member)
             if created:
+                if project.code_expire_days > 0:
+                    code.expires_at = timezone.now() + datetime.timedelta(days=project.code_expire_days)
+                    code.save()
                 messages.success(request, f'成功为会员 {nickname} 生成提取码: {code.code}')
             else:
                 messages.info(request, f'会员 {nickname} 的提取码已存在: {code.code}')
@@ -157,6 +207,40 @@ def code_logs(request, code_id):
     code = get_object_or_404(ExtractionCode.objects.select_related('member', 'project'), id=code_id)
     logs = code.logs.all().order_by('-accessed_at')
     return render(request, 'distribution/admin/code_logs.html', {'code': code, 'logs': logs})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def code_edit(request, code_id):
+    code = get_object_or_404(ExtractionCode, id=code_id)
+    if request.method == 'POST':
+        expires_at_str = request.POST.get('expires_at')
+        if expires_at_str:
+            from django.utils.dateparse import parse_datetime
+            from django.utils import timezone
+            try:
+                dt = parse_datetime(expires_at_str)
+                if dt is not None:
+                    if timezone.is_naive(dt):
+                        dt = timezone.make_aware(dt)
+                    code.expires_at = dt
+            except Exception:
+                pass
+        else:
+            code.expires_at = None
+        code.save()
+        messages.success(request, f'提取码 {code.code} 的有效期已更新！')
+        return redirect('custom_admin:project_detail', project_id=code.project.id)
+        
+    expires_at_formatted = ''
+    if code.expires_at:
+        from django.utils import timezone
+        local_dt = timezone.localtime(code.expires_at)
+        expires_at_formatted = local_dt.strftime('%Y-%m-%dT%H:%M')
+        
+    return render(request, 'distribution/admin/code_form.html', {
+        'code': code,
+        'expires_at_formatted': expires_at_formatted
+    })
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
@@ -229,3 +313,122 @@ def watermark_tool(request):
             else:
                 result = {'success': False, 'error': f'解密失败。提取到的Token为: {token}'}
     return render(request, 'distribution/admin/watermark_tool.html', {'result': result})
+
+import os
+import shutil
+from django.conf import settings
+from .models import WatermarkedVideo, SystemSetting
+
+# Helper function to get directory size
+def get_dir_size(path):
+    total_size = 0
+    if os.path.exists(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if not os.path.islink(fp):
+                    total_size += os.path.getsize(fp)
+    return total_size
+
+def format_size(size_in_bytes):
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_in_bytes < 1024.0:
+            return f"{size_in_bytes:.2f} {unit}"
+        size_in_bytes /= 1024.0
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def storage_monitor(request):
+    media_root = settings.MEDIA_ROOT
+    original_videos_path = os.path.join(media_root, 'videos')
+    watermarked_cache_path = os.path.join(media_root, 'watermarked')
+    
+    # Calculate sizes
+    original_size = get_dir_size(original_videos_path)
+    cache_size = get_dir_size(watermarked_cache_path)
+    total_media_size = get_dir_size(media_root)
+    other_size = total_media_size - original_size - cache_size
+    if other_size < 0: other_size = 0
+    
+    # Disk usage (windows)
+    total, used, free = shutil.disk_usage(media_root)
+    
+    # Count files
+    watermarked_count = WatermarkedVideo.objects.filter(status='done').count()
+    original_count = Video.objects.count()
+    
+    # Handle clear cache action
+    if request.method == 'POST' and request.POST.get('action') == 'clear_cache':
+        # 1. Delete physical files
+        if os.path.exists(watermarked_cache_path):
+            for item in os.listdir(watermarked_cache_path):
+                item_path = os.path.join(watermarked_cache_path, item)
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                else:
+                    os.remove(item_path)
+        
+        # 2. Re-create the empty directory
+        os.makedirs(watermarked_cache_path, exist_ok=True)
+        
+        # 3. Update database status
+        WatermarkedVideo.objects.all().delete()
+        
+        messages.success(request, '已成功清理所有防盗水印视频缓存！空间已释放。')
+        return redirect('custom_admin:storage_monitor')
+
+    context = {
+        'original_size_raw': original_size,
+        'cache_size_raw': cache_size,
+        'other_size_raw': other_size,
+        'total_media_size_raw': total_media_size,
+        
+        'original_size': format_size(original_size),
+        'cache_size': format_size(cache_size),
+        'other_size': format_size(other_size),
+        'total_media_size': format_size(total_media_size),
+        
+        'disk_total': format_size(total),
+        'disk_used': format_size(used),
+        'disk_free': format_size(free),
+        'disk_percent': round((used / total) * 100, 1) if total > 0 else 0,
+        
+        'watermarked_count': watermarked_count,
+        'original_count': original_count,
+    }
+    return render(request, 'distribution/admin/storage_monitor.html', context)
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def system_settings(request):
+    setting = SystemSetting.get_setting()
+    
+    if request.method == 'POST':
+        site_title = request.POST.get('site_title')
+        if site_title:
+            setting.site_title = site_title
+            
+        bg_opacity = request.POST.get('bg_opacity')
+        if bg_opacity is not None and bg_opacity != '':
+            try:
+                setting.bg_opacity = int(bg_opacity)
+            except ValueError:
+                pass
+                
+        if 'bg_image' in request.FILES:
+            # Delete old image if exists
+            if setting.bg_image:
+                if os.path.exists(setting.bg_image.path):
+                    os.remove(setting.bg_image.path)
+            setting.bg_image = request.FILES['bg_image']
+        elif 'clear_bg' in request.POST:
+            if setting.bg_image:
+                if os.path.exists(setting.bg_image.path):
+                    os.remove(setting.bg_image.path)
+            setting.bg_image = None
+            
+        setting.save()
+        messages.success(request, '系统设置已成功保存！')
+        return redirect('custom_admin:system_settings')
+        
+    return render(request, 'distribution/admin/settings.html', {'setting': setting})

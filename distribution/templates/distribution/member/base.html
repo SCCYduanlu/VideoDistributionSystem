@@ -3,14 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}会员专属视频提取{% endblock %}</title>
+    <title>{% block title %}{{ setting.site_title }}{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
+            {% if not setting.bg_image %}
             background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            {% else %}
+            background-color: #f5f7fa;
+            {% endif %}
             min-height: 100vh;
+            position: relative;
         }
+        {% if setting.bg_image %}
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('{{ setting.bg_image.url }}');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            opacity: {{ setting.opacity_decimal }};
+            z-index: -2;
+        }
+        {% endif %}
     </style>
 </head>
 <body class="font-sans antialiased text-gray-800">
@@ -18,8 +36,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <i class="fas fa-gem text-yellow-500 text-2xl mr-2"></i>
-                    <span class="font-bold text-xl tracking-tight text-gray-900">VIP 专属视频中心</span>
+                    <span class="font-bold text-xl tracking-tight text-gray-900">{{ setting.site_title }}</span>
                 </div>
                 <div class="flex items-center">
                     {% block nav_extra %}{% endblock %}
@@ -45,8 +62,8 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="text-center text-gray-500 text-sm py-6 mt-auto">
-        &copy; 2026 主播会员视频中心. All rights reserved.
+    <footer class="text-center text-gray-500 text-sm py-6 mt-auto relative z-10">
+        &copy; 2026 {{ setting.site_title }}. All rights reserved.
     </footer>
 </body>
 </html>

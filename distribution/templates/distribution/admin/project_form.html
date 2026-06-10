@@ -1,7 +1,7 @@
 {% extends 'distribution/admin/base.html' %}
 
-{% block title %}新建项目 - 管理后台{% endblock %}
-{% block header %}新建项目{% endblock %}
+{% block title %}{% if project %}编辑项目{% else %}新建项目{% endif %} - 管理后台{% endblock %}
+{% block header %}{% if project %}编辑项目: {{ project.title }}{% else %}新建项目{% endif %}{% endblock %}
 
 {% block content %}
 <div class="bg-white rounded-lg shadow max-w-2xl mx-auto p-6">
@@ -9,16 +9,43 @@
         {% csrf_token %}
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">项目名称 *</label>
-            <input type="text" name="title" required class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：2026年6月会员专享视频">
+            <input type="text" name="title" required value="{{ project.title|default:'' }}" class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：2026年6月会员专享视频">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">项目描述 (可选)</label>
-            <textarea name="description" rows="4" class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="简要描述这个项目的视频内容..."></textarea>
+            <textarea name="description" rows="4" class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="简要描述这个项目的视频内容...">{{ project.description|default:'' }}</textarea>
         </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">提取码有效期（天）</label>
+            <input type="number" name="code_expire_days" value="{{ project.code_expire_days|default:'0' }}" min="0" class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">填 0 表示永久有效。如果填 30，则表示该项目下生成的提取码在生成后 30 天过期。</p>
+        </div>
+        
+        {% if project %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                </div>
+                <div class="ml-3">
+                    <div class="flex items-center h-5">
+                        <input id="update_existing_codes" name="update_existing_codes" type="checkbox" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                        <label for="update_existing_codes" class="ml-2 block text-sm text-yellow-700 font-medium">
+                            同时更新已生成的提取码过期时间
+                        </label>
+                    </div>
+                    <p class="mt-2 text-xs text-yellow-600">
+                        如果不勾选，修改有效期只对<b>新生成</b>的提取码生效。勾选后，将以每个历史提取码的生成时间重新计算并刷新它们的过期时间。
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         <div class="flex justify-end space-x-3">
-            <a href="{% url 'custom_admin:project_list' %}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">取消</a>
+            <a href="{% if project %}{% url 'custom_admin:project_detail' project.id %}{% else %}{% url 'custom_admin:project_list' %}{% endif %}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">取消</a>
             <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                保存项目
+                {% if project %}保存修改{% else %}保存项目{% endif %}
             </button>
         </div>
     </form>

@@ -2,9 +2,19 @@
 
 {% block title %}项目详情: {{ project.title }} - 管理后台{% endblock %}
 {% block header %}
-<div class="flex items-center">
-    <a href="{% url 'custom_admin:project_list' %}" class="text-gray-500 hover:text-gray-700 mr-2"><i class="fas fa-arrow-left"></i></a>
-    项目详情: {{ project.title }}
+<div class="flex items-center justify-between w-full">
+    <div class="flex items-center">
+        <a href="{% url 'custom_admin:project_list' %}" class="text-gray-500 hover:text-gray-700 mr-2"><i class="fas fa-arrow-left"></i></a>
+        项目详情: {{ project.title }}
+    </div>
+    <div>
+        <a href="{% url 'custom_admin:project_edit' project.id %}" class="text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1.5 rounded transition-colors mr-2">
+            <i class="fas fa-edit"></i> 编辑项目
+        </a>
+        <a href="{% url 'custom_admin:project_delete' project.id %}" class="text-sm bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded transition-colors">
+            <i class="fas fa-trash-alt"></i> 删除项目
+        </a>
+    </div>
 </div>
 {% endblock %}
 
@@ -12,7 +22,17 @@
 <div class="bg-white rounded-lg shadow p-6 mb-6">
     <h3 class="text-lg font-medium text-gray-900 mb-2">项目信息</h3>
     <p class="text-sm text-gray-600 mb-4">{{ project.description|default:"无描述" }}</p>
-    <div class="text-xs text-gray-500">创建于: {{ project.created_at|date:"Y-m-d H:i:s" }}</div>
+    <div class="flex gap-6 text-xs text-gray-500">
+        <div><i class="fas fa-calendar-alt mr-1"></i>创建于: {{ project.created_at|date:"Y-m-d H:i:s" }}</div>
+        <div>
+            <i class="fas fa-hourglass-half mr-1"></i>提取码有效期: 
+            {% if project.code_expire_days > 0 %}
+                <span class="text-indigo-600 font-medium">{{ project.code_expire_days }} 天</span>
+            {% else %}
+                <span class="text-green-600 font-medium">永久有效</span>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -65,6 +85,11 @@
                     <p class="text-sm font-medium text-gray-900">{{ code.member.nickname }} <span class="text-xs text-gray-500">(QQ: {{ code.member.qq }})</span></p>
                     <p class="text-xs text-gray-500 mt-1 mb-1">
                         提取码: <span class="font-mono bg-gray-100 px-1 rounded text-indigo-600">{{ code.code }}</span>
+                        {% if code.expires_at %}
+                            <span class="ml-2 text-red-500"><i class="fas fa-clock mr-1"></i>过期时间: {{ code.expires_at|date:"Y-m-d H:i" }}</span>
+                        {% else %}
+                            <span class="ml-2 text-green-500"><i class="fas fa-infinity mr-1"></i>永久有效</span>
+                        {% endif %}
                     </p>
                     <p class="text-xs text-gray-500 flex items-center gap-3">
                         <span><i class="fas fa-eye mr-1"></i>访问次数: <span class="{% if code.access_count > 0 %}text-green-600 font-medium{% endif %}">{{ code.access_count }}</span></span>
@@ -75,6 +100,7 @@
                 </div>
                 <div class="flex items-center space-x-3">
                     <a href="{% url 'custom_admin:code_logs' code.id %}" class="text-blue-600 hover:text-blue-900 text-sm" title="查看详细日志"><i class="fas fa-list-alt"></i> 日志</a>
+                    <a href="{% url 'custom_admin:code_edit' code.id %}" class="text-indigo-600 hover:text-indigo-900 text-sm" title="编辑有效期"><i class="fas fa-edit"></i> 编辑</a>
                     <a href="{% url 'custom_admin:code_delete' code.id %}" class="text-red-600 hover:text-red-900 text-sm" title="删除"><i class="fas fa-trash"></i> 删除</a>
                 </div>
             </li>

@@ -4,6 +4,7 @@ from django.utils.crypto import get_random_string
 class Project(models.Model):
     title = models.CharField(max_length=200, verbose_name='项目名称')
     description = models.TextField(blank=True, verbose_name='项目描述')
+    code_expire_days = models.IntegerField(default=0, verbose_name='提取码有效期(天)')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
 
     class Meta:
@@ -73,6 +74,31 @@ class AccessLog(models.Model):
 
     def __str__(self):
         return f"{self.extraction_code.code} - {self.ip_address}"
+
+class SystemSetting(models.Model):
+    site_title = models.CharField(max_length=200, default='VIP 专属视频中心', verbose_name='提取端标题')
+    bg_image = models.ImageField(upload_to='settings/', null=True, blank=True, verbose_name='提取端背景图')
+    bg_opacity = models.IntegerField(default=100, verbose_name='背景图不透明度')
+
+    @property
+    def opacity_decimal(self):
+        return self.bg_opacity / 100.0
+
+    class Meta:
+        verbose_name = '系统设置'
+        verbose_name_plural = '系统设置'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_setting(cls):
+        setting, created = cls.objects.get_or_create(pk=1)
+        return setting
+
+    def __str__(self):
+        return "系统全局设置"
 
 class WatermarkedVideo(models.Model):
     extraction_code = models.ForeignKey(ExtractionCode, on_delete=models.CASCADE, related_name='watermarked_videos')

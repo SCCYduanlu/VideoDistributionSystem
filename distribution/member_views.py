@@ -1,19 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse, FileResponse
-from .models import ExtractionCode, AccessLog, WatermarkedVideo, Video
+from .models import ExtractionCode, AccessLog, WatermarkedVideo, Video, SystemSetting
 from .utils import start_watermark_task
 import os
 from django.conf import settings
 
+def get_system_setting():
+    return SystemSetting.get_setting()
+
 def index(request):
-    return render(request, 'distribution/member/index.html')
+    return render(request, 'distribution/member/index.html', {'setting': get_system_setting()})
 
 def verify_code(request):
     if request.method == 'POST':
         code_str = request.POST.get('code')
+        from django.utils import timezone
         try:
             code = ExtractionCode.objects.get(code=code_str, is_active=True)
+            
+            # Check expiration
+            if code.expires_at and code.expires_at < timezone.now():
+                messages.error(request, '该提取码已过期')
+                return redirect('member:index')
+                
             # Log access
             x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
             if x_forwarded_for:
@@ -32,7 +42,13 @@ def verify_code(request):
     return redirect('member:index')
 
 def video_list(request, code):
+    from django.utils import timezone
     extraction_code = get_object_or_404(ExtractionCode, code=code, is_active=True)
+    
+    if extraction_code.expires_at and extraction_code.expires_at < timezone.now():
+        messages.error(request, '该提取码已过期')
+        return redirect('member:index')
+        
     project = extraction_code.project
     videos = project.videos.all()
     return render(request, 'distribution/member/video_list.html', {
@@ -40,10 +56,17 @@ def video_list(request, code):
         'videos': videos,
         'member': extraction_code.member,
         'code': extraction_code.code,
+        'expires_at': extraction_code.expires_at,
+        'setting': get_system_setting(),
     })
 
 def download_video(request, code, video_id):
+    from django.utils import timezone
     extraction_code = get_object_or_404(ExtractionCode, code=code, is_active=True)
+    
+    if extraction_code.expires_at and extraction_code.expires_at < timezone.now():
+        return JsonResponse({'status': 'failed', 'error': '提取码已过期'}) if request.headers.get('x-requested-with') == 'XMLHttpRequest' else redirect('member:index')
+        
     video = get_object_or_404(Video, id=video_id, project=extraction_code.project)
     
     # Check if a watermarked video already exists
