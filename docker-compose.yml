@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: video_distribution_web
+    ports:
+      - "8000:8000"
+    volumes:
+      # 持久化数据库
+      - ./db.sqlite3:/app/db.sqlite3
+      # 持久化用户上传的视频和系统设置图片
+      - ./media:/app/media
+    restart: unless-stopped
+    environment:
+      - DEBUG=False
+      # 如果有配置生产环境的 SECRET_KEY 可以加在这里
+      # - SECRET_KEY=your_production_secret_key

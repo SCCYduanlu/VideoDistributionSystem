@@ -46,12 +46,39 @@
 
 ## 🚀 快速部署指南
 
-### 1. 环境准备
+> **强烈推荐使用 Docker 进行一键部署**，这将完美解决繁琐的 `FFmpeg` 安装配置与环境依赖问题。
+
+### 方案 A：Docker 一键部署 (推荐 🌟)
+
+1. **确保服务器已安装 Docker 和 Docker Compose**
+2. **克隆代码并进入目录**
+   ```bash
+   git clone <your-repository-url>
+   cd VideoDistributionSystem
+   ```
+3. **一键启动服务**
+   ```bash
+   docker-compose up -d --build
+   ```
+4. **初始化数据库并创建管理员**
+   ```bash
+   # 执行数据库迁移
+   docker exec -it video_distribution_web python manage.py migrate
+   # 创建超级管理员账号
+   docker exec -it video_distribution_web python manage.py createsuperuser
+   ```
+> 此时服务已在 `http://你的服务器IP:8000` 运行。所有数据和视频文件会自动保存在宿主机的 `db.sqlite3` 和 `media` 目录下，不用担心重启数据丢失。
+
+---
+
+### 方案 B：本地环境手动部署
+
+#### 1. 环境准备
 确保你的服务器或本地开发环境已安装：
 - **Python 3.10** 或更高版本
 - **FFmpeg**（必须安装并将其添加到系统的环境变量 `PATH` 中）
 
-### 2. 克隆项目与安装依赖
+#### 2. 克隆项目与安装依赖
 ```bash
 # 克隆代码
 git clone <your-repository-url>
@@ -64,23 +91,23 @@ venv\Scripts\activate
 # Linux/Mac 激活
 source venv/bin/activate
 
-# 安装依赖 (如果没有 requirements.txt，请手动安装以下核心库)
-pip install django scipy numpy cryptography
+# 安装依赖
+pip install -r requirements.txt
 ```
 
-### 3. 数据库迁移
+#### 3. 数据库迁移
 ```bash
 python manage.py makemigrations
 python manage.py migrate
 ```
 
-### 4. 创建超级管理员
+#### 4. 创建超级管理员
 创建一个用于登录后台的管理员账号：
 ```bash
 python manage.py createsuperuser
 ```
 
-### 5. 启动服务
+#### 5. 启动服务
 ```bash
 python manage.py runserver
 ```
