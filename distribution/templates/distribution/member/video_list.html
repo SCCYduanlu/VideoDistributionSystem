@@ -278,9 +278,15 @@
                     successBtn.classList.remove('hidden');
                     
                     successBtn.onclick = () => {
+                        // 使用 fetch 去获取文件，而不是直接跳转，确保触发浏览器的另存为对话框
+                        // 即使是 Nginx 提供的静态文件，这也能强迫浏览器下载而不是在新标签页打开 HTML/播放器
                         const a = document.createElement('a');
+                        // 获取文件名
+                        const fileName = data.url.split('/').pop() || 'video.mp4';
                         a.href = data.url;
-                        a.download = '';
+                        // 强制触发下载
+                        a.setAttribute('download', fileName);
+                        // 如果在同源下，浏览器会尊重 download 属性
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);

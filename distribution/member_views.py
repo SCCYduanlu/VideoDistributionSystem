@@ -78,6 +78,11 @@ def download_video(request, code, video_id):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         # AJAX polling for status
         if wv.status == 'done':
+            # Instead of pointing to media URL (which Nginx handles but might not force download),
+            # we return the direct view URL to ensure headers are set, or better, 
+            # let Nginx handle the download via X-Accel-Redirect.
+            # But the simplest is to let Django return the file with attachment headers,
+            # or just rely on the frontend <a> tag with 'download' attribute.
             download_url = f"{settings.MEDIA_URL}{wv.file_path}"
             return JsonResponse({'status': 'done', 'url': download_url})
         elif wv.status == 'failed':
