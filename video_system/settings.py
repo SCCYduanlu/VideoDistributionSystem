@@ -26,7 +26,7 @@ WATERMARK_SECRET_KEY = b'3nPOeCXItxmH1FxwYU9Ew9DI99n9JcWXItAt2-iPWWo='
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
