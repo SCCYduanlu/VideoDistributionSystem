@@ -28,6 +28,17 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# 信任的跨域来源，用于解决 Nginx 反向代理或公网 IP 访问时的 CSRF 拦截
+# 从环境变量中读取生产环境的域名或 IP，如果没配置则默认信任本地测试环境
+TRUSTED_ORIGINS = os.environ.get('TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+if TRUSTED_ORIGINS:
+    # 允许逗号分隔多个域名/IP
+    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in TRUSTED_ORIGINS.split(',') if origin.strip()])
+
 
 # Application definition
 

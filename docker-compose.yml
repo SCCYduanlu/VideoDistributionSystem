@@ -16,7 +16,8 @@ services:
     restart: unless-stopped
     environment:
       - DEBUG=False
-      # 如果有配置生产环境的 SECRET_KEY 可以加在这里
+      # 从 .env 文件中读取配置，实现部署自动化
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
       # - SECRET_KEY=your_production_secret_key
 
   nginx:
