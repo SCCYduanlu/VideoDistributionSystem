@@ -1,0 +1,118 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}系统设置 - 管理后台{% endblock %}
+{% block header %}系统设置{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl bg-white rounded-lg shadow overflow-hidden">
+    <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
+        <h3 class="text-lg font-medium leading-6 text-gray-900">
+            <i class="fas fa-desktop mr-2 text-indigo-500"></i>前台提取端外观设置
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">配置粉丝观看页面的标题和背景图片。</p>
+    </div>
+    
+    <div class="p-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- 网站标题 -->
+            <div>
+                <label for="site_title" class="block text-sm font-medium text-gray-700">前端标题</label>
+                <div class="mt-1">
+                    <input type="text" name="site_title" id="site_title" value="{{ setting.site_title }}" required
+                        class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border">
+                </div>
+                <p class="mt-2 text-sm text-gray-500">显示在粉丝浏览器标签页和导航栏的文字。</p>
+            </div>
+
+            <!-- 背景图片 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700">背景图片</label>
+                <div class="mt-2 flex items-center space-x-6">
+                    <div class="shrink-0" id="preview_container">
+                        {% if setting.bg_image %}
+                            <img id="preview_image" class="h-32 w-48 object-cover rounded-lg shadow" src="{{ setting.bg_image.url }}" alt="当前背景">
+                        {% else %}
+                            <div id="no_preview" class="h-32 w-48 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                                <span>无背景图 (默认渐变)</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="space-y-3">
+                        <label class="block">
+                            <span class="sr-only">选择图片</span>
+                            <input type="file" id="bg_image_input" name="bg_image" accept="image/*"
+                                class="block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-indigo-50 file:text-indigo-700
+                                hover:file:bg-indigo-100
+                                ">
+                        </label>
+                        {% if setting.bg_image %}
+                        <div class="flex items-center mt-2">
+                            <input type="checkbox" name="clear_bg" id="clear_bg" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                            <label for="clear_bg" class="ml-2 block text-sm text-red-600">
+                                删除当前背景图（恢复默认样式）
+                            </label>
+                        </div>
+                        {% endif %}
+                        <p class="text-xs text-gray-500">支持 JPG, PNG, WEBP。建议分辨率 1920x1080。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 背景图透明度 -->
+            <div>
+                <label for="bg_opacity" class="block text-sm font-medium text-gray-700 mb-2">
+                    背景图不透明度 (<span id="opacity_val">{{ setting.bg_opacity }}</span>%)
+                </label>
+                <div class="mt-2 flex items-center space-x-4">
+                    <span class="text-sm text-gray-500">透明</span>
+                    <input type="range" name="bg_opacity" id="bg_opacity" min="0" max="100" value="{{ setting.bg_opacity }}" 
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        oninput="document.getElementById('opacity_val').innerText = this.value">
+                    <span class="text-sm text-gray-500">清晰</span>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">调整背景图片的显示强度，数值越小越透明（融入底层背景色）。如果文字看不清，建议调低不透明度。</p>
+            </div>
+
+            <div class="pt-5 border-t border-gray-200 flex justify-end">
+                <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <i class="fas fa-save mr-2 mt-0.5"></i> 保存设置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const imageInput = document.getElementById('bg_image_input');
+        const previewContainer = document.getElementById('preview_container');
+        
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const objectUrl = URL.createObjectURL(file);
+                
+                // 清空现有预览
+                previewContainer.innerHTML = '';
+                
+                // 创建新的图片元素并展示预览
+                const img = document.createElement('img');
+                img.id = 'preview_image';
+                img.className = 'h-32 w-48 object-cover rounded-lg shadow';
+                img.src = objectUrl;
+                img.alt = '新背景预览';
+                
+                previewContainer.appendChild(img);
+            }
+        });
+    });
+</script>
+{% endblock %}

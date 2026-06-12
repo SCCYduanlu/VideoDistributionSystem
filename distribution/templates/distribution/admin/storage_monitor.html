@@ -1,0 +1,111 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}媒体存储监控 - 管理后台{% endblock %}
+{% block header %}媒体存储监控{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Storage Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-500">
+                    <i class="fas fa-video text-2xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="mb-2 text-sm font-medium text-gray-600">原画视频占用 (共 {{ original_count }} 个)</p>
+                    <p class="text-lg font-semibold text-gray-700">{{ original_size }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  可清理
+                </span>
+            </div>
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-indigo-100 text-indigo-500">
+                    <i class="fas fa-fingerprint text-2xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="mb-2 text-sm font-medium text-gray-600">水印分发缓存 (共 {{ watermarked_count }} 个)</p>
+                    <p class="text-lg font-semibold text-gray-700">{{ cache_size }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-gray-400">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-gray-100 text-gray-500">
+                    <i class="fas fa-server text-2xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="mb-2 text-sm font-medium text-gray-600">服务器磁盘总占用</p>
+                    <p class="text-lg font-semibold text-gray-700">{{ disk_used }} / {{ disk_total }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Details & Actions -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">
+                <i class="fas fa-chart-pie mr-2 text-gray-500"></i>磁盘空间分布
+            </h3>
+        </div>
+        <div class="p-6">
+            <!-- Progress Bar representing disk usage -->
+            <div class="mb-2 flex justify-between text-sm text-gray-600 font-medium">
+                <span>系统盘使用率</span>
+                <span>{{ disk_percent }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-8">
+                <div class="bg-{% if disk_percent > 90 %}red{% elif disk_percent > 75 %}yellow{% else %}green{% endif %}-500 h-4 rounded-full" style="width: {{ disk_percent }}%"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="font-medium text-gray-800 mb-4 border-b pb-2">存储结构说明</h4>
+                    <ul class="space-y-4 text-sm text-gray-600">
+                        <li class="flex items-start">
+                            <i class="fas fa-circle text-blue-500 mt-1 mr-2 text-[10px]"></i>
+                            <div>
+                                <span class="font-bold text-gray-800">原画视频 ({{ original_size }})：</span>
+                                <p class="mt-1">您在后台上传的原始高清视频。这些是系统的核心资产，不可随意删除。</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-circle text-indigo-500 mt-1 mr-2 text-[10px]"></i>
+                            <div>
+                                <span class="font-bold text-gray-800">水印分发缓存 ({{ cache_size }})：</span>
+                                <p class="mt-1">当会员下载视频时，系统动态生成的带有隐写 Token 的分发副本。为了避免同一会员重复下载时再次消耗服务器算力，这些副本会被暂时缓存。</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-indigo-50 p-5 rounded-lg border border-indigo-100 flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-bold text-indigo-800 mb-2"><i class="fas fa-broom mr-2"></i>缓存清理建议</h4>
+                        <p class="text-sm text-indigo-700 mb-4">
+                            随着会员下载量的增加，【水印分发缓存】会占用极大的磁盘空间（因为每个下载者都有一个独立副本）。<br><br>
+                            如果您的服务器磁盘空间告急，您可以随时点击下方按钮一键清空所有缓存副本。清空后不影响系统运行，当会员再次下载时，系统会自动重新生成他们的专属副本。
+                        </p>
+                    </div>
+                    
+                    <form method="post" onsubmit="return confirm('警告：确定要清空所有已生成的会员专属水印视频缓存吗？\n\n这会释放 {{ cache_size }} 的磁盘空间。\n清空后，如果会员再次请求下载，系统将重新消耗算力生成。');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="clear_cache">
+                        <button type="submit" class="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            <i class="fas fa-trash-alt mr-2"></i> 释放 {{ cache_size }} 缓存空间
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

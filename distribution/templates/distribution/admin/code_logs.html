@@ -1,0 +1,67 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}访问日志 - {{ code.member.nickname }} - 管理后台{% endblock %}
+{% block header %}
+<div class="flex items-center">
+    <a href="{% url 'custom_admin:project_detail' code.project.id %}" class="text-gray-500 hover:text-gray-700 mr-2"><i class="fas fa-arrow-left"></i></a>
+    会员访问日志详情
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">会员与提取码信息</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+            <p class="text-xs text-gray-500 mb-1">所属项目</p>
+            <p class="text-sm font-medium text-gray-900">{{ code.project.title }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500 mb-1">会员信息</p>
+            <p class="text-sm font-medium text-gray-900">{{ code.member.nickname }} <span class="text-gray-500 font-normal">(QQ: {{ code.member.qq }})</span></p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500 mb-1">提取码</p>
+            <p class="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded inline-block text-indigo-600">{{ code.code }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500 mb-1">总访问次数</p>
+            <p class="text-sm font-medium {% if logs.count > 10 %}text-red-600{% elif logs.count > 0 %}text-green-600{% else %}text-gray-500{% endif %}">{{ logs.count }} 次</p>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-history text-gray-500 mr-2"></i>访问历史记录</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">序号</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">访问时间</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">设备/浏览器 (User Agent)</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for log in logs %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ forloop.counter }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ log.accessed_at|date:"Y-m-d H:i:s" }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="bg-gray-100 px-2 py-1 rounded text-gray-700 font-mono text-xs">{{ log.ip_address }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 break-words max-w-lg">{{ log.user_agent }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">该会员暂未使用提取码进行访问。</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

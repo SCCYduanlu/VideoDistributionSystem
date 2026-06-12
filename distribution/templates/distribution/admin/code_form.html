@@ -1,0 +1,48 @@
+{% extends 'distribution/admin/base.html' %}
+
+{% block title %}编辑提取码 - 管理后台{% endblock %}
+{% block header %}编辑提取码: {{ code.code }}{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow max-w-2xl mx-auto p-6">
+    <div class="mb-6 bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <h4 class="text-sm font-medium text-gray-500 mb-2">提取码信息</h4>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+                <span class="text-gray-500">所属项目:</span>
+                <span class="font-medium text-gray-900 ml-1">{{ code.project.title }}</span>
+            </div>
+            <div>
+                <span class="text-gray-500">提取码:</span>
+                <span class="font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded ml-1">{{ code.code }}</span>
+            </div>
+            <div>
+                <span class="text-gray-500">关联会员:</span>
+                <span class="font-medium text-gray-900 ml-1">{{ code.member.nickname }}</span>
+            </div>
+            <div>
+                <span class="text-gray-500">QQ号:</span>
+                <span class="font-medium text-gray-900 ml-1">{{ code.member.qq }}</span>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">过期时间</label>
+            <input type="datetime-local" name="expires_at" value="{{ expires_at_formatted }}" class="w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-gray-700">
+            <p class="text-xs text-gray-500 mt-2">
+                <i class="fas fa-info-circle mr-1"></i>留空表示永久有效。如果要设置为永久有效，请清空输入框内的内容。
+            </p>
+        </div>
+        
+        <div class="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+            <a href="{% url 'custom_admin:project_detail' code.project.id %}" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">取消</a>
+            <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                保存修改
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
