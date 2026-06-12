@@ -12,6 +12,7 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libavcodec-extra \
+    libsndfile1 \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
