@@ -35,5 +35,5 @@ RUN mkdir -p /app/media/videos /app/media/watermarked /app/media/settings
 # 暴露端口
 EXPOSE 8000
 
-# 启动 Gunicorn 服务器 (因为音频处理可能耗时较长，增加 timeout 设置)
-CMD ["gunicorn", "video_system.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "300"]
+# 启动 Gunicorn 服务器 (启用多线程 gthread 模式，大幅提升并发处理能力)
+CMD ["gunicorn", "video_system.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "10", "--worker-class", "gthread", "--timeout", "600"]

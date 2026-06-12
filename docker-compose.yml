@@ -4,15 +4,30 @@ services:
   web:
     build: .
     container_name: video_distribution_web
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       # 持久化数据库
       - ./db.sqlite3:/app/db.sqlite3
       # 持久化用户上传的视频和系统设置图片
       - ./media:/app/media
+      # 挂载静态文件目录供 Nginx 读取
+      - ./staticfiles:/app/staticfiles
     restart: unless-stopped
     environment:
       - DEBUG=False
       # 如果有配置生产环境的 SECRET_KEY 可以加在这里
       # - SECRET_KEY=your_production_secret_key
+
+  nginx:
+    image: nginx:alpine
+    container_name: video_distribution_nginx
+    ports:
+      - "8000:80"  # 依然对外暴露 8000 端口，对用户透明无感
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./media:/app/media:ro
+      - ./staticfiles:/app/staticfiles:ro
+    depends_on:
+      - web
+    restart: unless-stopped

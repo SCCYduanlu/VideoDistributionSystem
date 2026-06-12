@@ -56,20 +56,17 @@
                     <i class="fas fa-shield-alt mr-2 group-hover:animate-pulse"></i> <span>生成安全下载</span>
                 </button>
 
-                <!-- Processing State (Hidden by default) -->
-                <div id="processingState" class="hidden bg-gray-50 border border-indigo-100 rounded-lg p-3 w-full">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center space-x-2">
-                            <i id="stepIcon" class="fas fa-cog fa-spin text-indigo-500"></i>
-                            <span id="stepText" class="text-sm font-bold text-indigo-700">正在初始化...</span>
-                        </div>
-                        <span id="percentText" class="text-xs font-mono font-bold text-indigo-500 bg-indigo-100 px-1.5 py-0.5 rounded">0%</span>
+                <!-- Loading State (Hidden by default) -->
+                <div id="processingState" class="hidden text-center py-2 w-full">
+                    <div class="flex items-center justify-center space-x-2 mb-2">
+                        <i id="stepIcon" class="fas fa-spinner fa-spin text-indigo-500"></i>
+                        <span class="text-sm font-medium text-gray-700" id="stepText">正在为您准备专属视频...</span>
+                        <span class="text-sm font-bold text-indigo-600 ml-2" id="percentText">0%</span>
                     </div>
-                    
-                    <!-- Single Progress Bar -->
-                    <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                        <div id="singleBar" class="h-full bg-indigo-500 transition-all duration-300 w-0"></div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="singleBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
+                    <p class="text-xs text-gray-400 mt-2">这可能需要几十秒的时间，请勿关闭页面</p>
                 </div>
 
                 <!-- Success State (Hidden by default) -->
@@ -221,30 +218,19 @@
     }
     
     function updateProgress(status) {
-        const stepText = document.getElementById('stepText');
         const percentText = document.getElementById('percentText');
-        const stepIcon = document.getElementById('stepIcon');
         const bar = document.getElementById('singleBar');
         
         if (status === 'processing' || status === 'pending') {
-            stepText.innerText = '启动安全引擎';
-            currentPercent = 10;
-            stepIcon.className = 'fas fa-cog fa-spin text-indigo-500';
+            currentPercent = 5;
         } else if (status === 'extracting') {
-            stepText.innerText = '提取视频音轨';
-            currentPercent = 25;
-            stepIcon.className = 'fas fa-wave-square text-indigo-500';
+            currentPercent = 20;
         } else if (status === 'embedding') {
-            stepText.innerText = '注入防盗隐写';
-            currentPercent = 40;
-            stepIcon.className = 'fas fa-fingerprint text-indigo-500 animate-pulse';
+            currentPercent = 35;
         } else if (status === 'muxing') {
-            stepText.innerText = '重新打包封转';
-            stepIcon.className = 'fas fa-box-open text-indigo-500';
-            
-            // 启动基于时间的平滑进度动画 (从 40% 到 99%)
+            // 启动基于时间的平滑进度动画 (从 35% 到 99%)
             if (!muxingInterval) {
-                const startPercent = 40;
+                const startPercent = 35;
                 const endPercent = 99;
                 const range = endPercent - startPercent;
                 // 每 100ms 更新一次
