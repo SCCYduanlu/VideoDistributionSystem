@@ -175,32 +175,131 @@ def project_delete(request, project_id):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
 def video_create(request, project_id):
-    import random
-    from .utils import get_video_duration
     project = get_object_or_404(Project, id=project_id)
-    if request.method == 'POST':
-        title = request.POST.get('title')
-        video_file = request.FILES.get('video_file')
-        if title and video_file:
-            video = Video.objects.create(project=project, title=title, video_file=video_file)
-            
-            # Generate random watermark timestamps
-            duration = get_video_duration(video.video_file.path)
-            timestamps = []
-            if duration > 10:
-                # pick 3 random timestamps
-                for _ in range(3):
-                    timestamps.append(random.randint(5, int(duration) - 5))
-                timestamps.sort()
-            else:
-                timestamps = [0]
-            
-            video.watermark_timestamps = timestamps
-            video.save()
-            
-            messages.success(request, '视频上传成功！')
-            return redirect('custom_admin:project_detail', project_id=project.id)
     return render(request, 'distribution/admin/video_form.html', {'project': project})
+
+import hashlib
+import shutil
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def video_upload_status(request, project_id):
+    upload_id = request.GET.get('upload_id')
+    if not upload_id:
+        return JsonResponse({'error': 'Missing upload_id'}, status=400)
+    
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', safe_id)
+    
+    uploaded_chunks = []
+    if os.path.exists(temp_dir):
+        for f in os.listdir(temp_dir):
+            if f.startswith('chunk_'):
+                try:
+                    uploaded_chunks.append(int(f.split('_')[1]))
+                except ValueError:
+                    pass
+    
+    return JsonResponse({'uploaded_chunks': uploaded_chunks})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def video_upload_chunk(request, project_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    upload_id = request.POST.get('upload_id')
+    chunk_index = request.POST.get('chunk_index')
+    chunk_file = request.FILES.get('file')
+    
+    if not all([upload_id, chunk_index, chunk_file]):
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', safe_id)
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    chunk_path = os.path.join(temp_dir, f'chunk_{chunk_index}')
+    with open(chunk_path, 'wb+') as f:
+        for chunk in chunk_file.chunks():
+            f.write(chunk)
+            
+    return JsonResponse({'status': 'ok'})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def video_upload_complete(request, project_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    project = get_object_or_404(Project, id=project_id)
+    upload_id = request.POST.get('upload_id')
+    filename = request.POST.get('filename')
+    title = request.POST.get('title')
+    total_chunks = request.POST.get('total_chunks')
+    
+    if not all([upload_id, filename, title, total_chunks]):
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        
+    try:
+        total_chunks = int(total_chunks)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid total_chunks'}, status=400)
+        
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', safe_id)
+    
+    # Verify all chunks exist
+    for i in range(total_chunks):
+        if not os.path.exists(os.path.join(temp_dir, f'chunk_{i}')):
+            return JsonResponse({'error': f'Missing chunk {i}'}, status=400)
+            
+    # Merge chunks
+    merged_filename = f"{safe_id}_{filename}"
+    merged_path = os.path.join(settings.MEDIA_ROOT, 'temp_uploads', merged_filename)
+    
+    try:
+        with open(merged_path, 'wb+') as dest_file:
+            for i in range(total_chunks):
+                chunk_path = os.path.join(temp_dir, f'chunk_{i}')
+                with open(chunk_path, 'rb') as c:
+                    shutil.copyfileobj(c, dest_file)
+                    
+        # Save to Video model
+        import random
+        from django.core.files import File
+        from .utils import get_video_duration
+        
+        with open(merged_path, 'rb') as f:
+            video = Video.objects.create(project=project, title=title)
+            video.video_file.save(filename, File(f))
+            
+        # Generate watermark timestamps
+        duration = get_video_duration(video.video_file.path)
+        timestamps = []
+        if duration > 10:
+            for _ in range(3):
+                timestamps.append(random.randint(5, int(duration) - 5))
+            timestamps.sort()
+        else:
+            timestamps = [0]
+            
+        video.watermark_timestamps = timestamps
+        video.save()
+        
+        messages.success(request, '视频上传成功！')
+        return JsonResponse({'status': 'ok'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    finally:
+        # Cleanup
+        if os.path.exists(merged_path):
+            os.remove(merged_path)
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')

@@ -46,11 +46,12 @@
 </div>
 
 <script>
-    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const form = this;
         const fileInput = document.getElementById('videoFile');
+        const titleInput = document.querySelector('input[name="title"]');
         const submitBtn = document.getElementById('submitBtn');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
@@ -59,58 +60,140 @@
         
         if (fileInput.files.length === 0) return;
         
-        // Disable button and show progress
+        const file = fileInput.files[0];
+        const title = titleInput.value;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Configuration
+        const chunkSize = 5 * 1024 * 1024; // 5MB per chunk
+        const totalChunks = Math.ceil(file.size / chunkSize);
+        // Generate a unique ID for this file upload to resume later
+        const uploadId = `${file.name}-${file.size}-${file.lastModified}`.replace(/[^a-zA-Z0-9-]/g, '');
+        
+        // UI Setup
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        submitBtn.innerText = '正在上传 (断点续传)';
         progressContainer.classList.remove('hidden');
+        progressBar.classList.remove('bg-red-500', 'bg-green-500');
+        progressBar.classList.add('bg-indigo-600');
         
-        const xhr = new XMLHttpRequest();
-        const formData = new FormData(form);
+        let uploadedChunks = [];
         
-        xhr.upload.addEventListener('progress', function(e) {
-            if (e.lengthComputable) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percentComplete + '%';
-                progressPercent.textContent = percentComplete + '%';
-                progressText.textContent = `正在上传... ${Math.round(e.loaded / (1024 * 1024))}MB / ${Math.round(e.total / (1024 * 1024))}MB`;
-                
-                if (percentComplete === 100) {
-                    progressText.textContent = '上传完成，服务器处理中...';
-                    progressBar.classList.add('animate-pulse');
+        // 1. Check status from server
+        try {
+            progressText.textContent = '检查上传进度...';
+            const statusResponse = await fetch(`{% url 'custom_admin:video_upload_status' project.id %}?upload_id=${uploadId}`);
+            if (statusResponse.ok) {
+                const data = await statusResponse.json();
+                uploadedChunks = data.uploaded_chunks || [];
+            }
+        } catch (err) {
+            console.error("Failed to check status", err);
+        }
+        
+        // 2. Upload chunks
+        let hasError = false;
+        
+        const updateProgress = () => {
+            const percentComplete = Math.round((uploadedChunks.length / totalChunks) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressPercent.textContent = percentComplete + '%';
+            
+            const uploadedMB = ((uploadedChunks.length * chunkSize) / (1024 * 1024)).toFixed(1);
+            const totalMB = (file.size / (1024 * 1024)).toFixed(1);
+            progressText.textContent = `正在上传... ${uploadedMB}MB / ${totalMB}MB`;
+        };
+        
+        updateProgress();
+        
+        for (let i = 0; i < totalChunks; i++) {
+            if (uploadedChunks.includes(i)) {
+                continue; // Skip already uploaded chunk
+            }
+            
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, file.size);
+            const chunk = file.slice(start, end);
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', csrfToken);
+            formData.append('upload_id', uploadId);
+            formData.append('chunk_index', i);
+            formData.append('file', chunk);
+            
+            let chunkSuccess = false;
+            let retries = 0;
+            const maxRetries = 5;
+            
+            while (!chunkSuccess && retries < maxRetries) {
+                try {
+                    const response = await fetch(`{% url 'custom_admin:video_upload_chunk' project.id %}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        chunkSuccess = true;
+                        uploadedChunks.push(i);
+                        updateProgress();
+                    } else {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+                } catch (err) {
+                    retries++;
+                    progressText.textContent = `网络错误，正在重试 (${retries}/${maxRetries})...`;
+                    console.error(`Chunk ${i} failed`, err);
+                    await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
                 }
             }
-        });
+            
+            if (!chunkSuccess) {
+                hasError = true;
+                progressText.textContent = '网络错误，上传暂停。请刷新页面或再次点击上传以继续。';
+                progressBar.classList.add('bg-red-500');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitBtn.innerText = '继续上传';
+                break;
+            }
+        }
         
-        xhr.addEventListener('load', function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                progressText.textContent = '处理成功！即将跳转...';
-                progressBar.classList.remove('animate-pulse');
-                progressBar.classList.add('bg-green-500');
+        // 3. Finalize upload
+        if (!hasError && uploadedChunks.length === totalChunks) {
+            progressText.textContent = '上传完成，服务器正在合并文件与生成防盗水印，请稍候...';
+            progressBar.classList.add('animate-pulse');
+            
+            const completeData = new FormData();
+            completeData.append('csrfmiddlewaretoken', csrfToken);
+            completeData.append('upload_id', uploadId);
+            completeData.append('filename', file.name);
+            completeData.append('title', title);
+            completeData.append('total_chunks', totalChunks);
+            
+            try {
+                const completeResponse = await fetch(`{% url 'custom_admin:video_upload_complete' project.id %}`, {
+                    method: 'POST',
+                    body: completeData
+                });
                 
-                // Assuming successful response redirects or sets a message
-                // In Django, standard form submission returns a redirect (302) but XHR follows it
-                // We'll just reload or redirect to the project page based on response URL
-                window.location.href = xhr.responseURL || "{% url 'custom_admin:project_detail' project.id %}";
-            } else {
-                progressText.textContent = '上传失败，请重试';
+                if (completeResponse.ok) {
+                    progressText.textContent = '处理成功！即将跳转...';
+                    progressBar.classList.remove('animate-pulse');
+                    progressBar.classList.add('bg-green-500');
+                    window.location.href = "{% url 'custom_admin:project_detail' project.id %}";
+                } else {
+                    throw new Error('Merge failed');
+                }
+            } catch (err) {
+                progressText.textContent = '文件合并处理失败，请联系管理员。';
                 progressBar.classList.remove('animate-pulse');
                 progressBar.classList.add('bg-red-500');
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitBtn.innerText = '重新提交合并';
             }
-        });
-        
-        xhr.addEventListener('error', function() {
-            progressText.textContent = '网络错误，上传失败';
-            progressBar.classList.remove('animate-pulse');
-            progressBar.classList.add('bg-red-500');
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        });
-        
-        xhr.open('POST', form.action, true);
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.send(formData);
+        }
     });
 </script>
 {% endblock %}

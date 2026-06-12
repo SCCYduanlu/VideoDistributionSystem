@@ -15,6 +15,9 @@ urlpatterns = [
     path('projects/<int:project_id>/delete/', views.project_delete, name='project_delete'),
     
     path('projects/<int:project_id>/video/add/', views.video_create, name='video_create'),
+    path('projects/<int:project_id>/video/upload/status/', views.video_upload_status, name='video_upload_status'),
+    path('projects/<int:project_id>/video/upload/chunk/', views.video_upload_chunk, name='video_upload_chunk'),
+    path('projects/<int:project_id>/video/upload/complete/', views.video_upload_complete, name='video_upload_complete'),
     path('video/<int:video_id>/delete/', views.video_delete, name='video_delete'),
     
     path('projects/<int:project_id>/member/add/', views.add_member_to_project, name='add_member'),
