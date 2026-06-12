@@ -5,6 +5,9 @@ FROM python:3.10-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+# 替换为清华大学 Debian 镜像源，加速 apt-get update 和 install
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+
 # 安装系统依赖（FFmpeg 是音频隐写核心依赖）
 RUN apt-get update && apt-get install -y \
     ffmpeg \
