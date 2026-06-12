@@ -50,26 +50,44 @@
 
 ### 方案 A：Docker 一键部署 (推荐 🌟)
 
-1. **确保服务器已安装 Docker 和 Docker Compose**
+1. **确保服务器已安装 Docker 和 Git**
+   *(以 Debian/Ubuntu 为例)*
+   ```bash
+   sudo apt update
+   sudo apt install git docker.io docker-compose apparmor apparmor-utils -y
+   sudo systemctl enable --now docker
+   ```
+   > 💡 **提示**：安装 `apparmor-utils` 是为了防止某些轻量云服务器内核缺少安全解析工具导致 Docker 构建报错。
+
 2. **克隆代码并进入目录**
    ```bash
+   cd /opt  # 推荐部署在 /opt 目录下
    git clone <your-repository-url>
    cd VideoDistributionSystem
-   ```
-3. **一键启动服务**
+
+3. **配置公网访问 (重要！)**
+   默认配置下 Django 已允许所有 IP 访问 (`ALLOWED_HOSTS = ['*']`)。如果你需要绑定特定域名，请修改 `video_system/settings.py` 中的 `ALLOWED_HOSTS`。
+
+4. **一键构建并启动服务**
    ```bash
-   docker-compose up -d --build
+   sudo docker-compose up -d --build
    ```
-4. **初始化数据库并创建管理员**
+
+5. **初始化数据库并创建管理员**
    ```bash
    # 执行数据库迁移
-   docker exec -it video_distribution_web python manage.py migrate
-   # 创建超级管理员账号
-   docker exec -it video_distribution_web python manage.py createsuperuser
+   sudo docker exec -it video_distribution_web python manage.py migrate
+   # 收集静态文件 (确保后台样式正常)
+   sudo docker exec -it video_distribution_web python manage.py collectstatic --noinput
+   # 创建超级管理员账号 (按提示输入账号密码)
+   sudo docker exec -it video_distribution_web python manage.py createsuperuser
    ```
-> 此时服务已在 `http://你的服务器IP:8000` 运行。所有数据和视频文件会自动保存在宿主机的 `db.sqlite3` 和 `media` 目录下，不用担心重启数据丢失。
+   > 💡 **快捷初始化（可选）**：如果你不想手动交互创建，可以直接使用 `python manage.py createsuperuser --noinput --username admin --email admin@example.com` （需配置环境变量），或手动创建时使用默认习惯：初始账号 `admin`，密码 `admin123`。
+   > ⚠️ **安全警告**：登录后台后，请**务必第一时间点击右上角【账号设置】修改初始密码**，以防系统被恶意登录！
 
----
+🎉 **至此，服务已部署完毕！**
+请确保服务器防火墙已放行 **8000** 端口。浏览器访问 `http://你的服务器IP:8000/admin/login/` 即可登录后台。所有数据自动保存在宿主机的 `db.sqlite3` 和 `media` 目录下，重启不丢失。
+
 
 ### 方案 B：本地环境手动部署
 
@@ -106,6 +124,8 @@ python manage.py migrate
 ```bash
 python manage.py createsuperuser
 ```
+> 💡 **提示**：建议设置初始账号为 `admin`，密码为 `admin123`。
+> ⚠️ **安全警告**：登录后台后，请**第一时间点击右上角【账号设置】修改初始密码**。
 
 #### 5. 启动服务
 ```bash

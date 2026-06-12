@@ -26,6 +26,50 @@ def admin_logout(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
+def admin_profile(request):
+    from django.contrib.auth import update_session_auth_hash
+    from django.contrib.auth.forms import PasswordChangeForm
+    from django.contrib.auth import get_user_model
+    
+    User = get_user_model()
+    user = request.user
+    password_form = PasswordChangeForm(user)
+    
+    # Add Tailwind classes to form fields manually
+    for field in password_form.fields.values():
+        field.widget.attrs['class'] = 'shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border'
+    
+    if request.method == 'POST':
+        if 'update_username' in request.POST:
+            new_username = request.POST.get('username')
+            if new_username and new_username != user.username:
+                if User.objects.filter(username=new_username).exclude(pk=user.pk).exists():
+                    messages.error(request, '该用户名已存在，请换一个。')
+                else:
+                    user.username = new_username
+                    user.save()
+                    messages.success(request, '用户名修改成功！')
+                    return redirect('custom_admin:admin_profile')
+                    
+        elif 'update_password' in request.POST:
+            password_form = PasswordChangeForm(user, request.POST)
+            for field in password_form.fields.values():
+                field.widget.attrs['class'] = 'shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border'
+            
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)  # 保持登录状态
+                messages.success(request, '密码修改成功！')
+                return redirect('custom_admin:admin_profile')
+            else:
+                messages.error(request, '密码修改失败，请检查输入。')
+                
+    return render(request, 'distribution/admin/admin_profile.html', {
+        'password_form': password_form
+    })
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
 def dashboard(request):
     projects_count = Project.objects.count()
     members_count = Member.objects.count()

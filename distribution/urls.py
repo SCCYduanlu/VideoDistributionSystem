@@ -6,6 +6,7 @@ app_name = 'custom_admin'
 urlpatterns = [
     path('login/', views.admin_login, name='login'),
     path('logout/', views.admin_logout, name='logout'),
+    path('profile/', views.admin_profile, name='admin_profile'),
     path('', views.dashboard, name='dashboard'),
     path('projects/', views.project_list, name='project_list'),
     path('projects/create/', views.project_create, name='project_create'),

@@ -65,8 +65,11 @@
                     </button>
                     <h2 class="text-xl font-semibold text-gray-800 ml-4 md:ml-0">{% block header %}控制台{% endblock %}</h2>
                 </div>
-                <div class="flex items-center">
-                    <span class="text-gray-600 mr-4">你好, {{ user.username }}</span>
+                <div class="flex items-center space-x-4">
+                    <span class="text-gray-600">你好, {{ user.username }}</span>
+                    <a href="{% url 'custom_admin:admin_profile' %}" class="text-indigo-600 hover:text-indigo-900 text-sm flex items-center" title="账号设置">
+                        <i class="fas fa-user-cog"></i><span class="ml-1 hidden sm:inline">账号设置</span>
+                    </a>
                 </div>
             </header>
 
