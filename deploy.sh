@@ -6,7 +6,7 @@ echo -e "\033[34m      视频分发系统 - 自动化部署与初始化脚本   
 echo -e "\033[34m====================================================\033[0m"
 
 # 1. 自动获取本机公网 IP 并生成 .env 文件
-echo -e "\n\033[33m[1/4] 正在检测服务器公网 IP...\033[0m"
+echo -e "\n\033[33m[1/5] 正在检测服务器公网 IP...\033[0m"
 PUBLIC_IP=$(curl -s ifconfig.me)
 
 if [ -z "$PUBLIC_IP" ]; then
@@ -20,8 +20,24 @@ fi
 echo "TRUSTED_ORIGINS=http://${PUBLIC_IP}:8000,http://${PUBLIC_IP},http://localhost:8000" > .env
 echo -e "\033[32m已生成 .env 配置文件，自动配置 CSRF 信任名单。\033[0m"
 
-# 2. 启动 Docker 容器
-echo -e "\n\033[33m[2/4] 正在构建并启动 Docker 容器...\033[0m"
+# 2. 配置 Docker 国内镜像加速 (防止拉取 python 镜像超时)
+echo -e "\n\033[33m[2/5] 正在配置 Docker 国内镜像加速...\033[0m"
+mkdir -p /etc/docker
+cat <<EOF > /etc/docker/daemon.json
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.nju.edu.cn",
+    "https://dockerproxy.com"
+  ]
+}
+EOF
+systemctl daemon-reload
+systemctl restart docker
+echo -e "\033[32mDocker 镜像加速配置完成并已重启服务。\033[0m"
+
+# 3. 启动 Docker 容器
+echo -e "\n\033[33m[3/5] 正在构建并启动 Docker 容器...\033[0m"
 docker-compose up -d --build
 
 if [ $? -ne 0 ]; then
@@ -29,14 +45,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 3. 等待数据库准备并执行迁移
-echo -e "\n\033[33m[3/4] 正在初始化数据库和静态文件...\033[0m"
+# 4. 等待数据库准备并执行迁移
+echo -e "\n\033[33m[4/5] 正在初始化数据库和静态文件...\033[0m"
 sleep 5 # 等待容器完全启动
 docker exec video_distribution_web python manage.py migrate
 docker exec video_distribution_web python manage.py collectstatic --noinput
 
-# 4. 创建超级管理员
-echo -e "\n\033[33m[4/4] 正在创建初始超级管理员...\033[0m"
+# 5. 创建超级管理员
+echo -e "\n\033[33m[5/5] 正在创建初始超级管理员...\033[0m"
 echo -e "正在使用默认配置创建账号: \033[32madmin\033[0m / 密码: \033[32madmin123\033[0m"
 docker exec video_distribution_web bash -c "
 cat <<EOF | python manage.py shell
