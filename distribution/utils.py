@@ -44,44 +44,63 @@ def get_video_duration(file_path):
 def embed_audio_watermark(audio_path, token):
     # A simplified spread-spectrum or high-frequency modulation approach for audio watermarking
     
-    data, sr = sf.read(audio_path)
-    if len(data.shape) > 1:
-        # Process first channel for simplicity
-        channel_data = data[:, 0]
-    else:
-        channel_data = data
-        
+    # 优化：对于低内存服务器 (如 2GB)，一次性读取整个音频到 numpy 数组会直接 OOM 被系统 kill 掉。
+    # 改为使用 soundfile 的块读取 (block processing) 机制
+    out_path = audio_path.replace('.wav', '_watermarked.wav')
+    
     # Convert token to binary string
     binary_token = ''.join(format(ord(c), '08b') for c in token)
-    
-    # We will embed one bit per segment of audio
     segment_size = 256
-    num_segments = min(len(binary_token), len(channel_data) // segment_size)
     
-    for i in range(num_segments):
-        segment = channel_data[i*segment_size : (i+1)*segment_size]
-        segment_dct = dct(segment, norm='ortho')
+    info = sf.info(audio_path)
+    sr = info.samplerate
+    
+    # 使用块处理，每次处理 1MB 的采样帧 (约几秒钟的音频)
+    block_size = 1024 * 1024 
+    
+    with sf.SoundFile(audio_path, 'r') as f_in, sf.SoundFile(out_path, 'w', samplerate=sr, channels=info.channels, subtype=info.subtype) as f_out:
         
-        # Modify high frequency components
-        freq_idx = int(segment_size * 0.8) # Very high frequency
+        bits_embedded = 0
+        total_bits = len(binary_token)
         
-        bit = int(binary_token[i])
-        magnitude = 0.5 
-        if bit == 1:
-            segment_dct[freq_idx:freq_idx+2] = magnitude
-        else:
-            segment_dct[freq_idx:freq_idx+2] = -magnitude
+        for block in f_in.blocks(blocksize=block_size):
+            # Process first channel for simplicity
+            if len(block.shape) > 1:
+                channel_data = block[:, 0]
+            else:
+                channel_data = block
+                
+            num_segments = len(channel_data) // segment_size
             
-        segment_idct = idct(segment_dct, norm='ortho')
-        
-        # Replace the segment
-        if len(data.shape) > 1:
-            data[i*segment_size : (i+1)*segment_size, 0] = segment_idct
-        else:
-            data[i*segment_size : (i+1)*segment_size] = segment_idct
-            
-    out_path = audio_path.replace('.wav', '_watermarked.wav')
-    sf.write(out_path, data, sr)
+            for i in range(num_segments):
+                if bits_embedded >= total_bits:
+                    break # 所有水印位已注入完毕，后续音频块不再处理 DCT，直接原样写出以节省 CPU
+                    
+                segment = channel_data[i*segment_size : (i+1)*segment_size]
+                segment_dct = dct(segment, norm='ortho')
+                
+                # Modify high frequency components
+                freq_idx = int(segment_size * 0.8) # Very high frequency
+                
+                bit = int(binary_token[bits_embedded])
+                magnitude = 0.5 
+                if bit == 1:
+                    segment_dct[freq_idx:freq_idx+2] = magnitude
+                else:
+                    segment_dct[freq_idx:freq_idx+2] = -magnitude
+                    
+                segment_idct = idct(segment_dct, norm='ortho')
+                
+                # Replace the segment
+                if len(block.shape) > 1:
+                    block[i*segment_size : (i+1)*segment_size, 0] = segment_idct
+                else:
+                    block[i*segment_size : (i+1)*segment_size] = segment_idct
+                    
+                bits_embedded += 1
+                
+            f_out.write(block)
+
     return out_path
 
 def extract_audio_watermark(audio_path, token_length=120): 
