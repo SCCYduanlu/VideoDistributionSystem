@@ -62,8 +62,8 @@
 
 2. **拉取代码并执行自动化部署**
    ```bash
-   # 克隆代码 (国内推荐加上 ghproxy 加速)
-   git clone https://ghproxy.net/https://github.com/SCCYduanlu/VideoDistributionSystem.git
+   # 克隆代码
+   git clone https://github.com/SCCYduanlu/VideoDistributionSystem.git
    cd VideoDistributionSystem
 
    # 赋予脚本执行权限并一键运行
@@ -89,7 +89,7 @@
 #### 2. 克隆项目与安装依赖
 ```bash
 # 克隆代码
-git clone <your-repository-url>
+git clone https://github.com/SCCYduanlu/VideoDistributionSystem.git
 cd VideoDistributionSystem
 
 # 建议使用虚拟环境
