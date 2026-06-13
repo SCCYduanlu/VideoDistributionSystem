@@ -12,6 +12,12 @@ def get_system_setting():
 def index(request):
     return render(request, 'distribution/member/index.html', {'setting': get_system_setting()})
 
+def csrf_failure(request, reason=""):
+    """
+    Custom CSRF failure view to handle expired tokens gracefully
+    """
+    return render(request, 'distribution/member/csrf_failure.html', {'setting': get_system_setting()})
+
 def verify_code(request):
     if request.method == 'POST':
         code_str = request.POST.get('code')
@@ -43,7 +49,10 @@ def verify_code(request):
 
 def video_list(request, code):
     from django.utils import timezone
-    extraction_code = get_object_or_404(ExtractionCode, code=code, is_active=True)
+    extraction_code = ExtractionCode.objects.filter(code=code, is_active=True).first()
+    
+    if not extraction_code:
+        return render(request, 'distribution/member/invalid_code.html', {'setting': get_system_setting()})
     
     if extraction_code.expires_at and extraction_code.expires_at < timezone.now():
         messages.error(request, '该提取码已过期')
@@ -62,7 +71,10 @@ def video_list(request, code):
 
 def download_video(request, code, video_id):
     from django.utils import timezone
-    extraction_code = get_object_or_404(ExtractionCode, code=code, is_active=True)
+    extraction_code = ExtractionCode.objects.filter(code=code, is_active=True).first()
+    
+    if not extraction_code:
+        return JsonResponse({'status': 'failed', 'error': '无效的提取码'}) if request.headers.get('x-requested-with') == 'XMLHttpRequest' else redirect('member:index')
     
     if extraction_code.expires_at and extraction_code.expires_at < timezone.now():
         return JsonResponse({'status': 'failed', 'error': '提取码已过期'}) if request.headers.get('x-requested-with') == 'XMLHttpRequest' else redirect('member:index')

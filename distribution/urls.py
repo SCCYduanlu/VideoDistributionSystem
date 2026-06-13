@@ -26,6 +26,10 @@ urlpatterns = [
     path('code/<int:code_id>/delete/', views.code_delete, name='code_delete'),
     
     path('watermark/', views.watermark_tool, name='watermark_tool'),
+    path('watermark/upload/status/', views.watermark_upload_status, name='watermark_upload_status'),
+    path('watermark/upload/chunk/', views.watermark_upload_chunk, name='watermark_upload_chunk'),
+    path('watermark/upload/complete/', views.watermark_upload_complete, name='watermark_upload_complete'),
+    
     path('storage/', views.storage_monitor, name='storage_monitor'),
     path('settings/', views.system_settings, name='system_settings'),
 ]

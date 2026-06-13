@@ -398,6 +398,132 @@ def code_delete(request, code_id):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_admin, login_url='custom_admin:login')
+def watermark_upload_status(request):
+    upload_id = request.GET.get('upload_id')
+    if not upload_id:
+        return JsonResponse({'error': 'Missing upload_id'}, status=400)
+    
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_watermark_uploads', safe_id)
+    
+    uploaded_chunks = []
+    if os.path.exists(temp_dir):
+        for f in os.listdir(temp_dir):
+            if f.startswith('chunk_'):
+                try:
+                    uploaded_chunks.append(int(f.split('_')[1]))
+                except ValueError:
+                    pass
+    
+    return JsonResponse({'uploaded_chunks': uploaded_chunks})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def watermark_upload_chunk(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    upload_id = request.POST.get('upload_id')
+    chunk_index = request.POST.get('chunk_index')
+    chunk_file = request.FILES.get('file')
+    
+    if not all([upload_id, chunk_index, chunk_file]):
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_watermark_uploads', safe_id)
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    chunk_path = os.path.join(temp_dir, f'chunk_{chunk_index}')
+    with open(chunk_path, 'wb+') as f:
+        for chunk in chunk_file.chunks():
+            f.write(chunk)
+            
+    return JsonResponse({'status': 'ok'})
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
+def watermark_upload_complete(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+    upload_id = request.POST.get('upload_id')
+    filename = request.POST.get('filename')
+    total_chunks = request.POST.get('total_chunks')
+    
+    if not all([upload_id, filename, total_chunks]):
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+        
+    try:
+        total_chunks = int(total_chunks)
+    except ValueError:
+        return JsonResponse({'error': 'Invalid total_chunks'}, status=400)
+        
+    safe_id = hashlib.md5(upload_id.encode('utf-8')).hexdigest()
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_watermark_uploads', safe_id)
+    
+    # Verify all chunks exist
+    for i in range(total_chunks):
+        if not os.path.exists(os.path.join(temp_dir, f'chunk_{i}')):
+            return JsonResponse({'error': f'Missing chunk {i}'}, status=400)
+            
+    # Merge chunks
+    merged_filename = f"{safe_id}_{filename}"
+    merged_path = os.path.join(settings.MEDIA_ROOT, 'temp_watermark_uploads', merged_filename)
+    
+    try:
+        with open(merged_path, 'wb+') as dest_file:
+            for i in range(total_chunks):
+                chunk_path = os.path.join(temp_dir, f'chunk_{i}')
+                with open(chunk_path, 'rb') as c:
+                    shutil.copyfileobj(c, dest_file)
+                    
+        import subprocess
+        from .utils import extract_audio_watermark, decrypt_token
+        # Extract audio
+        temp_audio = os.path.join(settings.MEDIA_ROOT, 'temp_watermark_uploads', f"{safe_id}_extract.wav")
+        subprocess.run(['ffmpeg', '-y', '-i', merged_path, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', temp_audio], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Extract token
+        token = extract_audio_watermark(temp_audio, token_length=120)
+        
+        # Cleanup audio
+        if os.path.exists(temp_audio): os.remove(temp_audio)
+        
+        if not token:
+            return JsonResponse({'success': False, 'error': '未能在视频音频中检测到有效的水印Token'})
+            
+        token = token.strip()
+        ext_id, vid_id = decrypt_token(token)
+        if ext_id and vid_id:
+            try:
+                code = ExtractionCode.objects.get(id=ext_id)
+                video = Video.objects.get(id=vid_id)
+                return JsonResponse({
+                    'success': True,
+                    'member_qq': code.member.qq,
+                    'member_nickname': code.member.nickname,
+                    'project_title': code.project.title,
+                    'code': code.code,
+                    'video_title': video.title,
+                    'extracted_token': token
+                })
+            except (ExtractionCode.DoesNotExist, Video.DoesNotExist):
+                return JsonResponse({'success': False, 'error': 'Token解析成功，但对应数据已删除'})
+        else:
+            return JsonResponse({'success': False, 'error': f'解密失败。提取到的Token为: {token}'})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f'处理视频文件时出错: {str(e)}'})
+    finally:
+        # Cleanup
+        if os.path.exists(merged_path):
+            os.remove(merged_path)
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_admin, login_url='custom_admin:login')
 def watermark_tool(request):
     from .utils import decrypt_token, extract_audio_watermark
     import os
@@ -405,56 +531,34 @@ def watermark_tool(request):
     
     result = None
     if request.method == 'POST':
-        # Check if a file was uploaded for audio extraction
-        if 'video_file' in request.FILES:
-            uploaded_file = request.FILES['video_file']
-            # Save temp file
-            temp_path = os.path.join(settings.MEDIA_ROOT, 'temp_upload.mp4')
-            with open(temp_path, 'wb+') as destination:
-                for chunk in uploaded_file.chunks():
-                    destination.write(chunk)
-                    
-            try:
-                import subprocess
-                # Extract audio
-                temp_audio = os.path.join(settings.MEDIA_ROOT, 'temp_extract.wav')
-                subprocess.run(['ffmpeg', '-y', '-i', temp_path, '-vn', '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '2', temp_audio], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                # Extract token
-                token = extract_audio_watermark(temp_audio, token_length=120)
-                
-                # Cleanup
-                if os.path.exists(temp_path): os.remove(temp_path)
-                if os.path.exists(temp_audio): os.remove(temp_audio)
-                
-                if token:
-                    request.POST = request.POST.copy()
-                    request.POST['token'] = token
+        # The form might be submitted with 'token' directly (manual input)
+        # Or dynamically submitted by JS after chunked upload completes (with extraction_error if failed)
+        
+        extraction_error = request.POST.get('extraction_error')
+        if extraction_error:
+            result = {'success': False, 'error': extraction_error}
+        else:
+            token = request.POST.get('token')
+            if token:
+                token = token.strip()
+                ext_id, vid_id = decrypt_token(token)
+                if ext_id and vid_id:
+                    try:
+                        code = ExtractionCode.objects.get(id=ext_id)
+                        video = Video.objects.get(id=vid_id)
+                        result = {
+                            'success': True,
+                            'member': code.member,
+                            'project': code.project,
+                            'code': code.code,
+                            'video': video,
+                            'extracted_token': token
+                        }
+                    except (ExtractionCode.DoesNotExist, Video.DoesNotExist):
+                        result = {'success': False, 'error': 'Token解析成功，但对应数据已删除'}
                 else:
-                    result = {'success': False, 'error': '未能在视频音频中检测到有效的水印Token'}
-            except Exception as e:
-                result = {'success': False, 'error': f'处理视频文件时出错: {str(e)}'}
-                
-        token = request.POST.get('token')
-        if token and not result:
-            token = token.strip()
-            ext_id, vid_id = decrypt_token(token)
-            if ext_id and vid_id:
-                try:
-                    code = ExtractionCode.objects.get(id=ext_id)
-                    video = Video.objects.get(id=vid_id)
-                    result = {
-                        'success': True,
-                        'member': code.member,
-                        'project': code.project,
-                        'code': code.code,
-                        'video': video,
-                        'extracted_token': token
-                    }
-                except (ExtractionCode.DoesNotExist, Video.DoesNotExist):
-                    result = {'success': False, 'error': 'Token解析成功，但对应数据已删除'}
-            else:
-                result = {'success': False, 'error': f'解密失败。提取到的Token为: {token}'}
+                    result = {'success': False, 'error': f'解密失败。提取到的Token为: {token}'}
+                    
     return render(request, 'distribution/admin/watermark_tool.html', {'result': result})
 
 import os

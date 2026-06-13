@@ -1,0 +1,30 @@
+{% extends 'distribution/member/base.html' %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mt-10">
+    <div class="px-8 pt-10 pb-8 text-center">
+        <div class="mx-auto w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
+            <i class="fas fa-sync-alt text-4xl text-yellow-500 animate-spin-slow"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">安全校验过期</h2>
+        <p class="text-gray-500 mb-8 text-sm">由于您在页面停留时间过长，安全校验已失效。<br>我们正在为您自动刷新页面重试...</p>
+        
+        <a href="{% url 'member:index' %}" class="block w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition-colors shadow hover:shadow-lg" id="retryBtn">
+            手动重试
+        </a>
+    </div>
+</div>
+
+<script>
+    // Automatically redirect back to the previous page or index after 2 seconds
+    setTimeout(function() {
+        const btn = document.getElementById('retryBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>正在重试...';
+        window.history.back();
+        // Fallback if history.back() doesn't work
+        setTimeout(function() {
+            window.location.href = "{% url 'member:index' %}";
+        }, 1000);
+    }, 2000);
+</script>
+{% endblock %}

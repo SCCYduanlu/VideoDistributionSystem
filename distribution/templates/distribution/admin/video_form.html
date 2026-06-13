@@ -65,7 +65,7 @@
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         
         // Configuration
-        const chunkSize = 5 * 1024 * 1024; // 5MB per chunk
+        const chunkSize = 20 * 1024 * 1024; // 20MB per chunk
         const totalChunks = Math.ceil(file.size / chunkSize);
         // Generate a unique ID for this file upload to resume later
         const uploadId = `${file.name}-${file.size}-${file.lastModified}`.replace(/[^a-zA-Z0-9-]/g, '');
@@ -95,17 +95,44 @@
         // 2. Upload chunks
         let hasError = false;
         
-        const updateProgress = () => {
-            const percentComplete = Math.round((uploadedChunks.length / totalChunks) * 100);
-            progressBar.style.width = percentComplete + '%';
-            progressPercent.textContent = percentComplete + '%';
+        const updateProgress = (currentChunkLoaded = 0) => {
+            const baseLoaded = uploadedChunks.length * chunkSize;
+            const currentTotalLoaded = Math.min(baseLoaded + currentChunkLoaded, file.size);
+            const percentComplete = (currentTotalLoaded / file.size) * 100;
             
-            const uploadedMB = ((uploadedChunks.length * chunkSize) / (1024 * 1024)).toFixed(1);
+            progressBar.style.width = percentComplete + '%';
+            progressPercent.textContent = Math.round(percentComplete) + '%';
+            
+            const uploadedMB = (currentTotalLoaded / (1024 * 1024)).toFixed(1);
             const totalMB = (file.size / (1024 * 1024)).toFixed(1);
             progressText.textContent = `正在上传... ${uploadedMB}MB / ${totalMB}MB`;
         };
         
         updateProgress();
+        
+        const uploadChunkWithProgress = (formData) => {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `{% url 'custom_admin:video_upload_chunk' project.id %}`, true);
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        updateProgress(e.loaded);
+                    }
+                };
+                
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`Server returned ${xhr.status}`));
+                    }
+                };
+                
+                xhr.onerror = () => reject(new Error('Network error'));
+                xhr.send(formData);
+            });
+        };
         
         for (let i = 0; i < totalChunks; i++) {
             if (uploadedChunks.includes(i)) {
@@ -128,18 +155,10 @@
             
             while (!chunkSuccess && retries < maxRetries) {
                 try {
-                    const response = await fetch(`{% url 'custom_admin:video_upload_chunk' project.id %}`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        chunkSuccess = true;
-                        uploadedChunks.push(i);
-                        updateProgress();
-                    } else {
-                        throw new Error(`Server returned ${response.status}`);
-                    }
+                    await uploadChunkWithProgress(formData);
+                    chunkSuccess = true;
+                    uploadedChunks.push(i);
+                    updateProgress(); // ensure it displays exact boundary on success
                 } catch (err) {
                     retries++;
                     progressText.textContent = `网络错误，正在重试 (${retries}/${maxRetries})...`;
